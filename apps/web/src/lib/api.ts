@@ -1,4 +1,4 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://jobpilot-ai-7cqs.onrender.com/api";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;

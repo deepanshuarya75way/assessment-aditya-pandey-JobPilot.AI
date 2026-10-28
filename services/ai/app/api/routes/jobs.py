@@ -24,7 +24,10 @@ from app.schemas.api.application_status import (
 from app.schemas.api.job_search import JobAnalyzeRequest
 from app.services.resume.extractor import extract_resume
 from app.services.resume.job_matcher import match_resume_to_job
-from app.services.company.job_trust import get_company_trust
+from app.services.company.job_trust import (
+    build_company_evidence_summary,
+    get_company_trust_with_evidence,
+)
 
 from app.schemas.api.responses import (
     JobSearchResponse,
@@ -511,36 +514,49 @@ async def analyze_single_job(
 ):
     try:
         database = request.app.state.database
-        job = await get_job(database, external_id=external_id, source=source)
+
+        job = await get_job(
+            database,
+            external_id=external_id,
+            source=source,
+        )
 
         if job is None:
-            raise HTTPException(status_code=404, detail="Job not found")
+            raise HTTPException(
+                status_code=404,
+                detail="Job not found",
+            )
 
-        # 1. Parse Candidate Resume
+        # 1. Parse candidate resume.
         resume = extract_resume(data.resume_text)
 
-        # 2. Compute ATS Resume Match & Missing Skills
+        # 2. Compute ATS resume match and missing skills.
         resume_match_report = match_resume_to_job(resume, job)
 
-        # 3. Compute Company Credibility & Trust
-        company_trust_report = get_company_trust(job)
+        # 3. Compute company trust and collect evidence once.
+        company_trust_report, company_evidence = (
+            get_company_trust_with_evidence(job)
+        )
 
+        # 4. Return the existing trust result plus readable evidence.
         return {
             "success": True,
             "job": job,
             "ats_match": resume_match_report,
             "company_trust": company_trust_report,
+            "company_evidence": build_company_evidence_summary(
+                company_evidence
+            ),
         }
 
     except HTTPException:
         raise
+
     except Exception as error:
         raise HTTPException(
             status_code=500,
             detail=f"Analysis failed: {str(error)}",
         ) from error
-
-
 
 # ============================================================
 # GENERATE INTERVIEW PREP
